@@ -183,59 +183,134 @@ def generate_suggestions(input_data: PredictionInput, is_placed: bool):
     
     
     # Sort suggestions by priority
-    priority_order = {"High": 0, "Medium": 1, "Low": 2}
-    suggestions.sort(key=lambda x: priority_order.get(x["priority"], 3))
+    priority_order = {"Very High": 0, "High": 1, "Medium": 2, "Low": 3}
+    suggestions.sort(key=lambda x: priority_order.get(x["priority"], 4))
+    
+    return suggestions, strengths
+
+def generate_suggestions(input_data: PredictionInput, is_placed: bool):
+    """Generate personalized suggestions based on strict CSE placement reality"""
+    suggestions = []
+    strengths = []
+    
+    # 1. Backlogs (CRITICAL)
+    if input_data.backlogs > 0:
+        suggestions.append({
+            "area": "Academics",
+            "priority": "Very High",
+            "message": f"You have {input_data.backlogs} active backlog(s). Most companies will inherently reject profiles with backlogs. Clear them immediately!",
+            "impact": "Critical"
+        })
+    else:
+        strengths.append("Clean Academic Record (No Backlogs)")
+
+    # 2. Internships (CRITICAL - "Real World Experience")
+    if input_data.internship_count == 0:
+        suggestions.append({
+            "area": "Practical Experience",
+            "priority": "High", # User emphasized this
+            "message": "You have 0 internships. In CSE, hands-on industry experience is often valued more than grades. Try to secure at least one internship.",
+            "impact": "Very High"
+        })
+    elif input_data.internship_count >= 2:
+        strengths.append(f"Strong Industry Exposure ({input_data.internship_count} internships)")
+
+    # 3. Live Projects (High Importance)
+    if input_data.live_projects < 2:
+        suggestions.append({
+            "area": "Projects",
+            "priority": "High",
+            "message": "Build more full-stack or ML projects (hosted on GitHub). Recruiters look for proof of coding skills.",
+            "impact": "High"
+        })
+    else:
+        strengths.append(f"Good Project Portfolio ({input_data.live_projects} projects)")
+
+    # 4. Technical Skills
+    if input_data.technical_skill_score < 75:
+        suggestions.append({
+            "area": "Technical Skills",
+            "priority": "High",
+            "message": "Your technical assessment score is low. Focus on DSA (Data Structures & Algorithms) and core CS concepts.",
+            "impact": "High"
+        })
+    elif input_data.technical_skill_score >= 90:
+        strengths.append(f"Excellent Technical Proficiency ({input_data.technical_skill_score}/100)")
+
+    # 5. CGPA
+    if input_data.cgpa < 7.5:
+        suggestions.append({
+            "area": "CGPA",
+            "priority": "Medium",
+            "message": "Your CGPA is on the lower side. While skills matter more, a 7.5+ is safe for all eligibility criteria.",
+            "impact": "Medium"
+        })
+    elif input_data.cgpa >= 8.5:
+        strengths.append(f"Strong Academic performance ({input_data.cgpa} CGPA)")
+
+    # 6. Extracurriculars (Low Importance)
+    if input_data.extracurricular_activities == 'No':
+        # Only suggest if profile is seemingly empty otherwise
+        if input_data.internship_count == 0 and input_data.live_projects == 0:
+            suggestions.append({
+                "area": "Extracurriculars",
+                "priority": "Low",
+                "message": "Consider some non-academic activities to show personality, but prioritize coding first.",
+                "impact": "Low"
+            })
     
     return suggestions, strengths
 
 def calculate_heuristic_score(input_data: PredictionInput) -> float:
     """
-    Calculate a deterministic score based on 'Data Reality' rules and weights.
-    Start with 100/100 and subtract points for deficits.
+    Calculate a deterministic score based on 'CSE Reality'.
+    Factors:
+    - Backlogs: Huge Penalty
+    - Internships/Projects: Huge Boost (or Penalty if missing)
+    - CGPA: Moderate factor (High is good, Low is bad, Avg is meh)
+    - Extracurriculars: Negligible
     """
-    score = 100.0
+    score = 70.0 # Start at a "Baseline" (Average Student), not 100. You earn points.
     
-    # 1. Backlogs (Weight: 40% - The Killer)
+    # 1. Backlogs (The Killer)
     if input_data.backlogs > 0:
-        penalty = 40 + (input_data.backlogs * 5)
-        score -= penalty
-        
-    # 2. CGPA (Weight: 30%)
-    # Perfect is 10. Lose 10 points for every 1.0 drop below 9.0
-    # e.g. 7.5 is 1.5 below 9.0 -> -15 points
-    if input_data.cgpa < 9.0:
-        deficit = 9.0 - input_data.cgpa
-        score -= (deficit * 10)
-        
-    # 3. Technical Skills (Weight: 20%)
-    # Perfect is 100. Lose 0.5 points for every 1 point below 90
-    # e.g. 70 is 20 below 90 -> -10 points
-    if input_data.technical_skill_score < 90:
-        deficit = 90 - input_data.technical_skill_score
-        score -= (deficit * 0.5)
+        score -= (30 + (input_data.backlogs * 10)) # Immediate drop to <40
+        return max(0.0, score) # Return early/low for backlogs
 
-    # 4. Extracurriculars
-    # Small penalty for 'No' to ensure strict hierarchy
-    if input_data.extracurricular_activities == 'No':
+    # 2. CGPA (Scale relative to 7.0)
+    # Range 7.0 to 10.0 -> add up to 20 points
+    if input_data.cgpa >= 7.0:
+        points = (input_data.cgpa - 7.0) * 6 # e.g. 7.5 -> 0.5*6 = +3. (Score 73). 9.0 -> 2.0*6 = +12 (Score 82)
+        score += points
+    else:
+        score -= 20 # Drop significantly if < 7.0
+
+    # 3. Technical Skills (0-20 points)
+    # Normalize 50-100 score to 0-20
+    if input_data.technical_skill_score > 50:
+        tech_points = (input_data.technical_skill_score - 50) * 0.4
+        score += tech_points
+    else:
+        score -= 10
+
+    # 4. Internships (The "Job Ready" Factor - 15 points)
+    if input_data.internship_count > 0:
+        score += (input_data.internship_count * 10) # 1 internship = +10. 2 = +20.
+    else:
+        score -= 10 # Penalty for no industry exposure
+
+    # 5. Projects (10 points)
+    if input_data.live_projects > 0:
+        score += (input_data.live_projects * 5)
+    else:
         score -= 5
 
-    # 5. Internships
-    # Penalty for 0 internships
-    if input_data.internship_count == 0:
-        score -= 5
-    
-    # --- HARD CAPS / THRESHOLDS ---
-    
-    # Backlogs Cap: Cannot exceed 45% (Placement unlikely)
-    if input_data.backlogs > 0:
-        score = min(score, 45)
-    
-    # Low CGPA Cap: Cannot exceed 50%
-    if input_data.cgpa < 7.0:
-        score = min(score, 50)
-        
+    # 6. Extracurriculars (Bonus only - 2 points)
+    if input_data.extracurricular_activities == 'Yes':
+        score += 2
+
     # Final Clamp
-    return max(0.0, min(99.0, score))
+    return max(10.0, min(98.0, score))
 
 @app.get("/")
 async def root():
