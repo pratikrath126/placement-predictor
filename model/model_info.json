@@ -1,0 +1,76 @@
+{
+  "best_model": "SVM",
+  "feature_cols": [
+    "ssc_percentage",
+    "hsc_percentage",
+    "degree_percentage",
+    "cgpa",
+    "entrance_exam_score",
+    "technical_skill_score",
+    "soft_skill_score",
+    "internship_count",
+    "live_projects",
+    "work_experience_months",
+    "certifications",
+    "attendance_percentage",
+    "backlogs",
+    "gender_Male",
+    "extracurricular_activities_Yes"
+  ],
+  "results": [
+    {
+      "Model": "Logistic Regression",
+      "Accuracy": 89.1,
+      "Precision": 71.92,
+      "Recall": 60.69,
+      "F1-Score": 65.83,
+      "ROC-AUC": 93.55,
+      "CV Mean": 88.9,
+      "CV Std": 0.57
+    },
+    {
+      "Model": "Random Forest",
+      "Accuracy": 100.0,
+      "Precision": 100.0,
+      "Recall": 100.0,
+      "F1-Score": 100.0,
+      "ROC-AUC": 100.0,
+      "CV Mean": 99.92,
+      "CV Std": 0.1
+    },
+    {
+      "Model": "Gradient Boosting",
+      "Accuracy": 100.0,
+      "Precision": 100.0,
+      "Recall": 100.0,
+      "F1-Score": 100.0,
+      "ROC-AUC": 100.0,
+      "CV Mean": 99.98,
+      "CV Std": 0.05
+    },
+    {
+      "Model": "SVM",
+      "Accuracy": 94.3,
+      "Precision": 88.16,
+      "Recall": 77.46,
+      "F1-Score": 82.46,
+      "ROC-AUC": 97.84,
+      "CV Mean": 93.82,
+      "CV Std": 0.26
+    },
+    {
+      "Model": "K-Nearest Neighbors",
+      "Accuracy": 90.2,
+      "Precision": 79.07,
+      "Recall": 58.96,
+      "F1-Score": 67.55,
+      "ROC-AUC": 92.41,
+      "CV Mean": 90.02,
+      "CV Std": 0.91
+    }
+  ],
+  "feature_importance": {},
+  "accuracy": 94.3,
+  "f1_score": 82.46,
+  "roc_auc": 97.84
+}
