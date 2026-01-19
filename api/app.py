@@ -263,54 +263,50 @@ def generate_suggestions(input_data: PredictionInput, is_placed: bool):
 
 def calculate_heuristic_score(input_data: PredictionInput) -> float:
     """
-    Calculate a deterministic score based on 'CSE Reality'.
-    Factors:
-    - Backlogs: Huge Penalty
-    - Internships/Projects: Huge Boost (or Penalty if missing)
-    - CGPA: Moderate factor (High is good, Low is bad, Avg is meh)
-    - Extracurriculars: Negligible
+    Calculate a deterministic score based on 'CSE Reality' rules and weights.
+    V5 Update: Lower baseline (60), stricter skill penalties, rounded output.
     """
-    score = 70.0 # Start at a "Baseline" (Average Student), not 100. You earn points.
+    score = 60.0 # Baseline (Average candidate with basic stats)
     
     # 1. Backlogs (The Killer)
     if input_data.backlogs > 0:
-        score -= (30 + (input_data.backlogs * 10)) # Immediate drop to <40
+        score -= (30 + (input_data.backlogs * 10)) # Immediate drop to <30
         return max(0.0, score) # Return early/low for backlogs
 
     # 2. CGPA (Scale relative to 7.0)
-    # Range 7.0 to 10.0 -> add up to 20 points
+    # Range 7.0 to 10.0 -> add up to 15 points
     if input_data.cgpa >= 7.0:
-        points = (input_data.cgpa - 7.0) * 6 # e.g. 7.5 -> 0.5*6 = +3. (Score 73). 9.0 -> 2.0*6 = +12 (Score 82)
+        points = (input_data.cgpa - 7.0) * 5 # e.g. 7.5 -> +2.5. 9.0 -> +10.
         score += points
     else:
-        score -= 20 # Drop significantly if < 7.0
+        score -= 20 # Drop significantly if < 7.0 (Eligibility risk)
 
-    # 3. Technical Skills (0-20 points)
-    # Normalize 50-100 score to 0-20
-    if input_data.technical_skill_score > 50:
-        tech_points = (input_data.technical_skill_score - 50) * 0.4
+    # 3. Technical Skills (Threshold based)
+    # Baseline expectation is 75. Bonus above, penalty below.
+    if input_data.technical_skill_score >= 75:
+        tech_points = (input_data.technical_skill_score - 75) * 0.4
         score += tech_points
     else:
-        score -= 10
+        # Penalty for being below average technical skill
+        penalty = (75 - input_data.technical_skill_score) * 0.5
+        score -= penalty
 
-    # 4. Internships (The "Job Ready" Factor - 15 points)
+    # 4. Internships (The "Job Ready" Factor)
     if input_data.internship_count > 0:
         score += (input_data.internship_count * 10) # 1 internship = +10. 2 = +20.
     else:
-        score -= 10 # Penalty for no industry exposure
+        score -= 5 # Minor penalty, but missing out on huge bonus
 
-    # 5. Projects (10 points)
+    # 5. Projects
     if input_data.live_projects > 0:
         score += (input_data.live_projects * 5)
-    else:
-        score -= 5
 
-    # 6. Extracurriculars (Bonus only - 2 points)
+    # 6. Extracurriculars (Tie-breaker only)
     if input_data.extracurricular_activities == 'Yes':
         score += 2
 
     # Final Clamp
-    return max(10.0, min(98.0, score))
+    return max(10.0, min(99.0, score))
 
 @app.get("/")
 async def root():
@@ -319,12 +315,11 @@ async def root():
 @app.post("/predict", response_model=PredictionResponse)
 async def predict(input_data: PredictionInput):
     try:
-        # We calculate the score purely based on the heuristic rules now
-        # to ensure "outputs that make sense" as requested by the user.
-        # The ML model is used implicitly via the rules derived from its analysis.
-        
+        # Calculate strict score
         final_score = calculate_heuristic_score(input_data)
-        probability = final_score / 100.0
+        
+        # Round to 1 decimal place to avoid "78.0000001"
+        final_score = round(final_score, 1)
         
         # Determine status
         is_placed = final_score >= 60.0 # Strict passing measure
@@ -335,7 +330,7 @@ async def predict(input_data: PredictionInput):
         
         return PredictionResponse(
             prediction=result,
-            probability=final_score, # Send raw score (0-99)
+            probability=final_score, # Clean rounded score
             suggestions=suggestions,
             strengths=strengths
         )
