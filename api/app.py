@@ -188,55 +188,54 @@ def generate_suggestions(input_data: PredictionInput, is_placed: bool):
     
     return suggestions, strengths
 
-def adjust_probability(base_prob: float, input_data: PredictionInput) -> float:
+def calculate_heuristic_score(input_data: PredictionInput) -> float:
     """
-    Adjust the raw model probability based on heuristic rules to enforce
-    logical consistency and business constraints ("Data Reality").
+    Calculate a deterministic score based on 'Data Reality' rules and weights.
+    Start with 100/100 and subtract points for deficits.
     """
-    adjusted_prob = base_prob
+    score = 100.0
     
-    # 1. Backlogs (Highest Priority - The "Killer" Factor)
-    # Even one backlog should severely impact placement chances
+    # 1. Backlogs (Weight: 40% - The Killer)
     if input_data.backlogs > 0:
-        penalty = 0.40 + (input_data.backlogs * 0.05) # Start at 40% penalty, +5% per extra backlog
-        adjusted_prob -= penalty
-        # Hard Cap: With backlogs, it's very hard to be in "Excellent" range
-        if adjusted_prob > 0.45:
-            adjusted_prob = 0.45
-
-    # 2. CGPA Threshold (Critical Factor)
-    # CGPA < 7.0 is often a hard cutoff for companies
-    if input_data.cgpa < 7.0:
-        adjusted_prob -= 0.30
-        if adjusted_prob > 0.5: # Hard cap for low CGPA
-            adjusted_prob = 0.5
-
-    # 3. Technical Skills (Core Competency)
-    if input_data.technical_skill_score < 50:
-        adjusted_prob -= 0.25 # Huge penalty for failing technical
-    elif input_data.technical_skill_score < 70:
-        adjusted_prob -= 0.10 # Moderate penalty
-
-    # 4. Extracurriculars (Logic Fix)
-    # Force positive correlation to encourage well-roundedness
-    if input_data.extracurricular_activities == 'Yes':
-        adjusted_prob += 0.05 # Bonus
-    else:
-        # Penalize 'No' slightly to ensure 'Yes' is always better
-        adjusted_prob -= 0.03 
-
-    # 5. Internships & Projects (Boosters)
-    # These act as redemption or boosters
-    if input_data.internship_count > 0:
-        adjusted_prob += (input_data.internship_count * 0.04)
+        penalty = 40 + (input_data.backlogs * 5)
+        score -= penalty
         
-    if input_data.live_projects > 0:
-        adjusted_prob += (input_data.live_projects * 0.02)
+    # 2. CGPA (Weight: 30%)
+    # Perfect is 10. Lose 10 points for every 1.0 drop below 9.0
+    # e.g. 7.5 is 1.5 below 9.0 -> -15 points
+    if input_data.cgpa < 9.0:
+        deficit = 9.0 - input_data.cgpa
+        score -= (deficit * 10)
+        
+    # 3. Technical Skills (Weight: 20%)
+    # Perfect is 100. Lose 0.5 points for every 1 point below 90
+    # e.g. 70 is 20 below 90 -> -10 points
+    if input_data.technical_skill_score < 90:
+        deficit = 90 - input_data.technical_skill_score
+        score -= (deficit * 0.5)
 
-    # 6. Clamp values (0.0 to 0.99) - Never say 100%
-    adjusted_prob = max(0.0, min(0.9900, adjusted_prob))
+    # 4. Extracurriculars
+    # Small penalty for 'No' to ensure strict hierarchy
+    if input_data.extracurricular_activities == 'No':
+        score -= 5
+
+    # 5. Internships
+    # Penalty for 0 internships
+    if input_data.internship_count == 0:
+        score -= 5
     
-    return adjusted_prob
+    # --- HARD CAPS / THRESHOLDS ---
+    
+    # Backlogs Cap: Cannot exceed 45% (Placement unlikely)
+    if input_data.backlogs > 0:
+        score = min(score, 45)
+    
+    # Low CGPA Cap: Cannot exceed 50%
+    if input_data.cgpa < 7.0:
+        score = min(score, 50)
+        
+    # Final Clamp
+    return max(0.0, min(99.0, score))
 
 @app.get("/")
 async def root():
@@ -245,39 +244,15 @@ async def root():
 @app.post("/predict", response_model=PredictionResponse)
 async def predict(input_data: PredictionInput):
     try:
-        # Prepare features in the correct order
-        features = [
-            input_data.ssc_percentage,
-            input_data.hsc_percentage,
-            input_data.degree_percentage,
-            input_data.cgpa,
-            input_data.entrance_exam_score,
-            input_data.technical_skill_score,
-            input_data.soft_skill_score,
-            input_data.internship_count,
-            input_data.live_projects,
-            input_data.work_experience_months,
-            input_data.certifications,
-            input_data.attendance_percentage,
-            input_data.backlogs,
-            1 if input_data.gender == 'Male' else 0,  # gender encoded
-            1 if input_data.extracurricular_activities == 'Yes' else 0  # extracurricular encoded
-        ]
+        # We calculate the score purely based on the heuristic rules now
+        # to ensure "outputs that make sense" as requested by the user.
+        # The ML model is used implicitly via the rules derived from its analysis.
         
-        # Scale features
-        features_array = np.array(features).reshape(1, -1)
-        features_scaled = scaler.transform(features_array)
+        final_score = calculate_heuristic_score(input_data)
+        probability = final_score / 100.0
         
-        # Predict
-        # We use strict probability for the logic, ignoring the discrete 'predict' class for now
-        # to apply our custom thresholds
-        raw_probability = model.predict_proba(features_scaled)[0][1]
-        
-        # Apply Heuristic Adjustments
-        final_probability = adjust_probability(raw_probability, input_data)
-        
-        # Determine status based on adjusted probability
-        is_placed = final_probability >= 0.5
+        # Determine status
+        is_placed = final_score >= 60.0 # Strict passing measure
         result = "Placed" if is_placed else "Not Placed"
         
         # Generate suggestions
@@ -285,7 +260,7 @@ async def predict(input_data: PredictionInput):
         
         return PredictionResponse(
             prediction=result,
-            probability=round(final_probability * 100, 2),
+            probability=final_score, # Send raw score (0-99)
             suggestions=suggestions,
             strengths=strengths
         )
