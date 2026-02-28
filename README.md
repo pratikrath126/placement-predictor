@@ -1,6 +1,6 @@
 # 🎓 Placement Predictor Model
 
-![Placement Predictor Screenshot](https://image.thum.io/get/width/1200/crop/800/https://placement-predictor-model-git-main-pratik-raths-projects.vercel.app/)
+![Placement Predictor Screenshot](public/assets/hero.png)
 
 A full-stack application that leverages Machine Learning to predict student placement outcomes based on academic performance, technical skills, and extracurricular activities. It provides personalized feedback, actionable suggestions, and a probabilistic placement score.
 
@@ -21,7 +21,7 @@ A full-stack application that leverages Machine Learning to predict student plac
 Here are some of the key sections of the application:
 
 ### 1. Hero Section & Dashboard
-![Hero Section Screenshot](https://image.thum.io/get/width/1200/crop/800/https://placement-predictor-model-git-main-pratik-raths-projects.vercel.app/)
+![Hero Section Screenshot](public/assets/hero.png)
 *The landing page providing an overview of the predictor and quick access to the prediction form.*
 
 ### 2. Prediction Form
