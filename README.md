@@ -25,12 +25,12 @@ Here are some of the key sections of the application:
 *The landing page providing an overview of the predictor and quick access to the prediction form.*
 
 ### 2. Prediction Form
-*(To add a screenshot of the prediction form, place your image in a `docs/` folder and link it here: `![Prediction Form](docs/prediction-form.png)`)*
+![Prediction Form](public/assets/predictor.png)
 *An intuitive form where students input their academic details, test scores, and project experience.*
 
-### 3. Results & Suggestions
-*(To add a screenshot of the results, place your image in a `docs/` folder and link it here: `![Results](docs/results.png)`)*
-*Displays the calculated placement probability along with critical feedback categorized by priority.*
+### 3. Analytics & EDA
+![EDA & Results](public/assets/eda.png)
+*Exploratory Data Analysis insights and placement statistics derived from the model data.*
 
 ## 🛠️ Tech Stack
 
@@ -68,6 +68,7 @@ placement-predictor/
 │   ├── label_encoders.pkl# Categorical encoders
 │   └── model_info.json   # Model performance metrics
 ├── public/               # Static assets
+│   └── assets/           # Application screenshots
 ├── src/                  # React Frontend
 │   ├── components/       # UI Components (Hero, Predictor, ModelInfo, etc.)
 │   ├── styles/           # CSS stylesheets
